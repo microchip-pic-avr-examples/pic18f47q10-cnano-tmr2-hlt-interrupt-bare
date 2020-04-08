@@ -30,114 +30,102 @@
 
 #define Timer2Period        0x2F        /* TMR2 Period is 100ms */
 #define Timer4Period        0xF1        /* TMR4 Period is 500ms */
-#define HltMode             0x87        /* TMR4 HLT (Hardware Limit Timer) config */
 #define DesiredThreshold    300         /* Desired threshold value */
 #define MaxThreshold        500         /* Maximum threshold value */
 #define AnalogChannel       0x00        /* Use ANA0 as input for ADCC */
 
 volatile uint16_t adcVal;
 
-static void CLK_init(void);
-static void PPS_init(void);
-static void PORT_init(void);
-static void ADCC_init(void);
-static void TMR2_init(void);
-static void TMR4_init(void);
-static void INTERRUPT_init(void);
-static uint16_t ADC_readValue(uint8_t);
-static void ADCC_interrupt(void);
-static void TMR4_interrupt(void);
+static void CLK_Initialize(void);
+static void PPS_Initialize(void);
+static void PORT_Initialize(void);
+static void ADCC_Initialize(void);
+static void TMR2_Initialize(void);
+static void TMR4_Initialize(void);
+static void INTERRUPT_Initialize(void);
+static uint16_t ADC_ReadValue(uint8_t);
+static void ADCC_Interrupt(void);
+static void TMR4_Interrupt(void);
 
-static void CLK_init(void)
+static void CLK_Initialize(void)
 {
     /* set HFINTOSC Oscillator */  
-    OSCCON1 = _OSCCON1_NOSC1_MASK | _OSCCON1_NOSC2_MASK;
+    OSCCON1 = 0x60;
     /* set HFFRQ to 1 MHz */
-    OSCFRQ = ~_OSCFREQ_HFFRQ_MASK;
+    OSCFRQ = 0x00;
 }
 
-static void PPS_init(void)
+static void PPS_Initialize(void)
 {
     /* Set RC7 as input for TMR4 (T4IN) */
-    T4INPPS = _T4INPPS_T4INPPS0_MASK
-            | _T4INPPS_T4INPPS1_MASK
-            | _T4INPPS_T4INPPS2_MASK
-            | _T4INPPS_T4INPPS4_MASK;
+    T4INPPS = 0x17;
 }
 
-static void PORT_init(void)
+static void PORT_Initialize(void)
 {
-    /* Set RA0 pin as analog */
-    ANSELA |= _ANSELA_ANSELA0_MASK;
-    /* Set RA0 pin as input  */
-    TRISA |= _TRISA_TRISA0_MASK;
     /* Set RC7 pin as digital */
-    ANSELC &= ~_ANSELC_ANSELC7_MASK;
-    /* Set RC7 pin as input */
-    TRISC |= _TRISC_TRISC7_MASK;
+    ANSELC = 0x7F;
     /* Set RE0 pin as output */
-    TRISE &= ~_TRISE_TRISE0_MASK;
+    TRISE = 0x06;
     /* Enable weak pull-up on pin RC7 */
-    WPUC |= _WPUC_WPUC7_MASK;
+    WPUC = 0x80;
 }
 
-static void ADCC_init(void)
+static void ADCC_Initialize(void)
 {
     /* ADACT Auto-Conversion Trigger Source is TMR2 */ 
-    ADACT |= _ADACT_ADACT2_MASK;
+    ADACT = 0x04;
     /* ADGO stop; ADFM right; ADON enabled; ADCONT disabled; ADCS FRC */
-    ADCON0 = _ADCON0_ADON_MASK     /* Enable ADCC module */
-           | _ADCON0_ADCS_MASK     /* Select FRC clock */
-           | _ADCON0_ADFM_MASK;    /* Result right justified */
-    /* Clear the ADC interrupt flag */
-    PIR1 &= ~_PIR1_ADIF_MASK;    
+    ADCON0 = 0x94;
+    /* Clear the ADCC interrupt flag */
+    PIR1bits.ADIF = 0;
     /* Enabling ADCC interrupt flag */
-    PIE1 |= _PIE1_ADIE_MASK;
+    PIE1bits.ADIE = 1;
 }
 
-static void TMR2_init(void)
+static void TMR2_Initialize(void)
 {
     /* TMR2 Clock source, LFINTOSC (00100) has 31 kHz */
-    T2CLKCON |= _T2CLKCON_CS2_MASK;
+    T2CLKCON = 0x04;
     /* T2PSYNC Not Synchronized; T2MODE Starts at T2ON = 1 and TMR2_ers = 0; T2CKPOL Rising Edge */
-    T2HLT |= _T2HLT_MODE1_MASK; 
+    T2HLT = 0x02; 
     /* TMR2 external reset is TMR4_postscaled */ 
-    T2RST |= _T2RST_T2RSEL1_MASK;
+    T2RST = 0x02;
     /* TMR2 ON on; T2 CKPS Prescaler 1:64; T2 OUTPS Postscaler 1:1 
        Minimum timer period is 31 kHz/64 = 2.064516 ms  */
-    T2CON |= _T0CON1_T0CS_MASK;
+    T2CON = 0xE0;
     /* Set TMR2 period, PR2 to 100ms */
     T2PR = Timer2Period;
     /* Clear the TMR2 interrupt flag */
-    PIR4 &= ~_PIR4_TMR2IF_MASK;
+    PIR4bits.TMR2IF = 0;
 }
 
-static void TMR4_init(void)
+static void TMR4_Initialize(void)
 {
     /* TMR4 Clock source, LFINTOSC (00100) has 31 kHz */
-    T4CLKCON |= _T4CLKCON_CS2_MASK;
+    T4CLKCON = 0x04;
     /* T4PSYNC Synchronized; T4MODE Resets at TMR4_ers = 1; T4CKPOL Rising Edge */
-    T4HLT |= HltMode;
-    /* TMR4 External reset signal by T4INPPS pin  */
+    T4HLT = 0x87;
+    /* TMR4 External reset signal by T4INPPS pin */
     T4RST = 0;
     /* TMR4 ON on; T4 CKPS Prescaler 1:64; T4 OUTPS Postscaler 1:1 
        Minimum timer period is 31 kHz/64 = 2.064516 ms  */ 
-    T4CON |= _T0CON1_T0CS_MASK;
+    T4CON = 0xE0;
     /* Set TMR4 period, PR4 to 500ms */
     T4PR = Timer4Period;
     /* Clear the TMR4 interrupt flag */
-    PIR4 &= ~_PIR4_TMR4IF_MASK;
+    PIR4bits.TMR4IF = 0;
     /* Enabling TMR4 interrupt flag */
-    PIE4 |= _PIE4_TMR4IE_MASK;
+    PIE4bits.TMR4IE = 1;
 }
 
-static void INTERRUPT_init(void)
+static void INTERRUPT_Initialize(void)
 {
-    INTCON = _INTCON_GIE_MASK           /* Enable Global Interrupts */
-           | _INTCON_PEIE_MASK;         /* Enable Peripheral Interrupts */   
+    INTCONbits.GIE  = 1;          /* Enable Global Interrupts */
+    INTCONbits.PEIE = 1;          /* Enable Peripheral Interrupts */ 
 }
 
-static uint16_t ADCC_readValue(uint8_t channel)
+static uint16_t ADCC_ReadValue(uint8_t channel)
 {   
     ADPCH = channel;     /* Set the input channel for ADCC */
     /* TMR2 is trigger source for auto-conversion for ADCC */
@@ -147,66 +135,66 @@ static uint16_t ADCC_readValue(uint8_t channel)
 static void __interrupt() INTERRUPT_manager (void)
 {
     /* Interrupt handler */
-    if (INTCON & _INTCON_PEIE_MASK)
+    if (INTCONbits.PEIE == 1)
     {
-        if ((PIE4 & _PIE4_TMR4IE_MASK) && (PIR4 & _PIR4_TMR4IF_MASK))
+        if (PIE4bits.TMR4IE == 1 && PIR4bits.TMR4IF == 1)
         {
-            TMR4_interrupt();
+            TMR4_Interrupt();
         } 
-        else if ((PIE1 & _PIE1_ADIE_MASK) && (PIR1 & _PIR1_ADIF_MASK))
+        else if (PIE1bits.ADIE == 1 && PIR1bits.ADIF == 1)
         {
-            ADCC_interrupt();
+            ADCC_Interrupt();
         } 
     }
 }
 
-static void ADCC_interrupt(void)
+static void ADCC_Interrupt(void)
 {
-    /* Clear the TMR2 interrupt flag */
-    PIR1 &= ~_PIR1_ADIF_MASK;
+    /* Clear the ADCC interrupt flag */
+    PIR1bits.ADIF = 0;
     
     if (adcVal < DesiredThreshold)
     {
         /* Toggle LED0 at the Timer2Period frequency */
-        LATE ^= _LATE_LATE0_MASK;
+         LATEbits.LATE0 = ~LATEbits.LATE0;
     }
     /* Get the conversion result from ADCC AnalogChannel */
-    adcVal = ADCC_readValue(AnalogChannel);
+    adcVal = ADCC_ReadValue(AnalogChannel);
 }
 
-static void TMR4_interrupt(void)
+static void TMR4_Interrupt(void)
 {
     /* Clear the TMR4 interrupt flag */
-    PIR4 &= ~_PIR4_TMR4IF_MASK;
+    PIR4bits.TMR4IF = 0;
 
     /* HLT trigger condition: if adcVal > MaxThreshold and pin RC7 is pulled-down */
     if (adcVal > MaxThreshold)
     {
         /* Toggle LED0 at the Timer4Period frequency */
-        LATE ^= _LATE_LATE0_MASK;
+        LATEbits.LATE0 = ~LATEbits.LATE0;
         /* HLT will stop TMR2 that also stops ADCC */
         /* Stop the Timer by writing to TMRxON bit */
-        T2CON &= ~_T2CON_T2ON_MASK;
+        T2CONbits.TMR2ON = 0;
     }
 }
 
 void main(void)
 {
     /* Initialize the device */
-    CLK_init();             /* Oscillator init function */
-    PPS_init();             /* Peripheral select init function */
-    PORT_init();            /* Port init function */
-    ADCC_init();            /* ADCC init function */
-    TMR2_init();            /* TMR2 init function */
-    TMR4_init();            /* TMR4 init function */
-    INTERRUPT_init();       /* Interrupt init function */
+    CLK_Initialize();             /* Oscillator Initialize function */
+    PPS_Initialize();             /* Peripheral select Initialize function */
+    PORT_Initialize();            /* Port Initialize function */
+    ADCC_Initialize();            /* ADCC Initialize function */
+    TMR2_Initialize();            /* TMR2 Initialize function */
+    TMR4_Initialize();            /* TMR4 Initialize function */
+    INTERRUPT_Initialize();       /* Interrupt Initialize function */
 
     while (1)
     {
         if ((adcVal > DesiredThreshold)&&(adcVal < MaxThreshold))
         {
             /* turn LED0 ON by writing pin RE0 to low */
-            LATE &= ~_LATE_LATE0_MASK;
+            LATEbits.LATE0 = 0;
         }
     }
 }
