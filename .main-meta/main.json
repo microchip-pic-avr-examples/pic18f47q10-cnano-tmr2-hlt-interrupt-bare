@@ -39,7 +39,7 @@
         "author": "Microchip",
         "subcategories": [
             [
-               "Peripherals"
+               "Peripherals",
 			   "TMR2"
             ]           			
         ],
