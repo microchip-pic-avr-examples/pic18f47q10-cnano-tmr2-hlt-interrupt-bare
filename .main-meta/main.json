@@ -4,7 +4,7 @@
     "content": {
         "metaDataVersion": "1.1.0",
         "name": "com.microchip.mcu8.mplabx.project.pic18f47q10-cnano-tmr2-hlt-interrupt-bare",
-        "version": "1.0.1",
+        "version": "1.0.2",
         "displayName": "Configure TMR4 as Hardware Limit Timer to Generate an Interrupt",
         "projectName": "pic18f47q10-cnano-tmr2-hlt-interrupt-bare",
         "shortDescription": "In this demo, uses TMR4 peripheral as a HLT in order to generate an interrupt and stop TMR2 that also stops the ADCC auto-conversion.",
@@ -39,18 +39,17 @@
         "author": "Microchip",
         "subcategories": [
             [
-               "Peripherals", "TIMER", "TMR2"
+               "Peripherals"
+			   "TMR2"
             ]           			
         ],
         "peripherals": [
-            "TIMER", "TMR2"
+            "TMR2"
         ],
         "keywords": [
             "Getting Started",
 			"Timers/Counters",
-            "Timer/Counter",
             "Hardware Limit Timer",
-            "Interrupt",
             "Bare Metal"
         ],
 		"additionalData": {
